@@ -1,9 +1,33 @@
+import argparse
 import os
 import re
 import time
-import time
+import pathlib
+import getpass
 import xml.etree.ElementTree as ET
 import requests
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", help="Target file/directory to be sent")
+    parser.add_argument(
+        "-p",
+        "--prompt",
+        action="store_true",
+        default=False,
+        help="Use terminal to input auth instead of env variable",
+    )
+    parser.add_argument(
+        "-k",
+        "--keep",
+        action="store_true",
+        default=False,
+        help="Keep files which are successfully sent (This option may cause disk space problem)",
+    )
+
+    args = parser.parse_args()
+    return args
 
 
 def login(username, password):
@@ -55,6 +79,7 @@ def upload_file(sess, f):
 
     return _dir
 
+
 def send_file(sess, f, _dir):
     auth_url = "https://iss.add.re.kr/webmail.AuthWebMail.do"
     send_file_url = "https://iss.add.re.kr/data.Data.do"
@@ -74,14 +99,14 @@ def send_file(sess, f, _dir):
         raise ValueError("Something is wrong while authenticating web mail")
 
     # Step 2: send file
-    data["cmd"] =  "dataSend"
+    data["cmd"] = "dataSend"
 
     r = sess.post(send_file_url, data=data)
     # TODO: check
 
 
-def check_sent(sess, f):
-    check_sent_url = "https://iss.add.re.kr/data.Data.do"
+def get_data_list(sess):
+    data_list_url = "https://iss.add.re.kr/data.Data.do"
     data = {
         "DATA_FLAG": "S",
         "M_FLAG": "I",
@@ -90,12 +115,8 @@ def check_sent(sess, f):
         "netType": "I",
     }
 
-    r = sess.post(check_sent_url, data=data)
+    r = sess.post(data_list_url, data=data)
     xml = r.text
-    matches = re.findall("<DATA_TITLE>(.+)</DATA_TITLE>", xml)
-
-    if f.name not in matches:
-        raise ValueError("%s not uploaded, please check manually" % f.name)
 
     tree = ET.fromstring(xml)
     status_map = {
@@ -105,37 +126,67 @@ def check_sent(sess, f):
         "M": "전송중",
         "W": "전송대기",
     }
+
+    data_list = []
     for data in tree.findall("DATA_LIST"):
-        fname = data.find("DATA_TITLE").text
-        if fname != f.name:
+        status = status_map.get(data.find("STATUS").text, data.find("STATUS").text)
+
+        data_list.append(
+            {
+                "idx": data.find("DATA_IDX").text,
+                "no": data.find("DOC_NO").text,
+                "title": data.find("DATA_TITLE").text,
+                "recv_time": data.find("DATA_RECV_TIME").text,
+                "filename": data.find("DATA_NAME").text,
+                "status": status,
+            }
+        )
+
+    return data_list
+
+
+def check_sent(f, data_list):
+    for data in data_list:
+        if data["title"] != f.name:
             continue
-        
-        status = data.find("STATUS").text
-        status_str = status_map.get(status)
 
-        if status_str is None:
-            raise KeyError("Unknown status `%s`" % status)
-
-        if status_str == "처리완료":
-            return True
+        status = data["status"]
+        if status == "처리완료":
+            return True, status
         else:
-            return False
+            return False, status
 
-    # should not come here
-    return False
-
-
-def delete_sent_file(file):
-    pass
+    # data not found
+    raise ValueError("%s not uploaded, please check manually" % f.name)
 
 
-def check_disk_space(sess):
-    check_disk_space_url = "https://iss.add.re.kr/user.AuthUser.do"
+def delete_sent_file(sess, f, data_list):
+
+    data = None
+    for d in data_list:
+        if d["title"] == f.name:
+            data = d
+            break
+    else:
+        raise ValueError("Matching data not found")
+
+    delete_file_url = "https://iss.add.re.kr/data.Data.do"
+    data = {
+        "DATA_IDX": data["idx"],
+        "cmd": "deleteData",
+    }
+
+    r = sess.post(delete_file_url, data=data)
+    # TODO: check
+
+
+def get_disk_space_left(sess):
+    disk_space_url = "https://iss.add.re.kr/user.AuthUser.do"
     data = {
         "cmd": "showDiskInfo",
     }
 
-    r = sess.post(check_disk_space_url, data=data)
+    r = sess.post(disk_space_url, data=data)
     text = r.text
     matches = re.findall("<DATA>.+<USE>(.+)</USE>.+</DATA>", text)
     if not matches:
@@ -146,36 +197,78 @@ def check_disk_space(sess):
     return spaces_total - int(space)
 
 
+def get_files(path):
+    p = pathlib.Path(path)
+    if p.is_dir():
+        return p.glob("*")
+    else:
+        return [p]
+
+
 def main():
-    username = os.environ.get("ADD_USERNAME")
-    password = os.environ.get("ADD_PASSWORD")
+    args = parse_args()
+
+    # Login
+    if args.prompt:
+        username = input("Username: ").strip()
+        password = getpass.getpass("Password: ").strip()
+    else:
+        username = os.environ.get("ADD_USERNAME")
+        password = os.environ.get("ADD_PASSWORD")
 
     if not username or not password:
-        print("Set ADD_USERNAME and ADD_PASSWORD")
+        print("Set ADD_USERNAME and ADD_PASSWORD for authentication")
+        print("If you want to type auth information directly, use `-p` option")
         exit(1)
 
     session = login(username, password)
-    space_left = check_disk_space(session)
-    
-    f = open("testfile.txt", "rb")
-    file_size = os.fstat(f.fileno()).st_size
-    file_size_mb = int(file_size / 1024 / 1024)
+    print("[*] Successfully logged in")
 
-    # safe margin for 10MB
-    if space_left - file_size_mb < 10:
-        print("Not enough space left")
-        exit(1)
+    # Send files
+    files = get_files(args.path)
+    num_files = len(files)
+    print("[*] Trying to send %d file(s)..." % num_files)
 
-    _dir = upload_file(session, f)
-    send_file(session, f, _dir)
+    for f in files:
+        if not f.is_file():
+            print("[*] %s is not a file, skipping..." % f.name)
 
-    check_interval = 10
-    while not check_sent(session, f):
-        print("%s Not sent..." % f.name)
-        time.sleep(check_interval)
+        fd = f.open(mode="rb")
 
-    print("sent!")
-    
-    
+        # check disk space first, if not enough space, stop sending
+        space_left = get_disk_space_left(session)
+        file_size = os.fstat(fd.fileno()).st_size
+        file_size_mb = int(file_size / 1024 / 1024)
+
+        if space_left - file_size_mb < 10:  # safe margin for 10MB
+            print("Not enough space left")
+            exit(1)
+
+        # upload and send the file
+        _dir = upload_file(session, fd)
+        send_file(session, fd, _dir)
+        time.sleep(
+            1
+        )  # short interval after sending file to prevent long waiting for small files
+
+        # check whether the file is send to local machine
+        check_interval = 10
+        data_list = get_data_list(session)
+        while True:
+            chk, status = check_sent(fd, data_list)
+            if chk:
+                break
+
+            print("%s Not sent (Status: %s)..." % (fd.name, status))
+            time.sleep(check_interval)
+            data_list = get_data_list(session)
+
+        print("[*] %s sent!" % fd.name)
+
+        if not args.keep:
+            print("[*] Deleting %s..." % fd.name)
+            delete_sent_file(session, fd, data_list)
+
+
 if __name__ == "__main__":
     main()
