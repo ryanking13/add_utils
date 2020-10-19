@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import re
 import time
 import pathlib
@@ -219,7 +220,7 @@ def main():
     if not username or not password:
         print("Set ADD_USERNAME and ADD_PASSWORD for authentication")
         print("If you want to type auth information directly, use `-p` option")
-        exit(1)
+        sys.exit(1)
 
     session = login(username, password)
     print("[*] Successfully logged in")
@@ -242,7 +243,7 @@ def main():
 
         if space_left - file_size_mb < 10:  # safe margin for 10MB
             print("Not enough space left")
-            exit(1)
+            sys.exit(1)
 
         # upload and send the file
         _dir = upload_file(session, fd)
