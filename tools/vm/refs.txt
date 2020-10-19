@@ -1,0 +1,4 @@
+https://docs.vmware.com/kr/VMware-Tools/10.2.0/com.vmware.vsphere.vmwaretools.doc/GUID-08BB9465-D40A-4E16-9E15-8C016CC8166F.html
+https://my.vmware.com/group/vmware/downloads/details?downloadGroup=VMTOOLS10322&productId=742
+https://kb.vmware.com/s/article/1022525
+https://m.blog.naver.com/cjh226/221159795371
