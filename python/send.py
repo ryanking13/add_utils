@@ -6,6 +6,7 @@ import time
 import pathlib
 import getpass
 import xml.etree.ElementTree as ET
+import zipfile
 import requests
 
 
@@ -25,6 +26,13 @@ def parse_args():
         action="store_true",
         default=False,
         help="Keep files which are successfully sent (This option may cause disk space problem)",
+    )
+    parser.add_argument(
+        "-c",
+        "--compress",
+        action="store_true",
+        default=False,
+        help="Compress files to zip before sending",
     )
 
     args = parser.parse_args()
@@ -206,6 +214,20 @@ def get_files(path):
         return [p]
 
 
+def compress_files(files, zipname=None):
+    if not files:
+        raise ValueError("No files given")
+
+    if zipname is None:
+        zipname = files[0].name + ".zip"
+
+    with zipfile.ZipFile(zipname, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            zf.write(f)
+
+    return pathlib.Path(zipname)
+
+
 def main():
     args = parse_args()
 
@@ -227,6 +249,10 @@ def main():
 
     # Send files
     files = get_files(args.path)
+
+    if args.compress:
+        files = [compress_files(files)]
+
     num_files = len(files)
     print("[*] Trying to send %d file(s)..." % num_files)
 
