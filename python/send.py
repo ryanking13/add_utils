@@ -12,7 +12,7 @@ import requests
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("path", help="Target file/directory to be sent")
+    parser.add_argument("path", nargs="+", help="Target file/directory to be sent")
     parser.add_argument(
         "-p",
         "--prompt",
@@ -248,7 +248,9 @@ def main():
     print("[*] Successfully logged in")
 
     # Send files
-    files = get_files(args.path)
+    files = []
+    for p in args.path:
+        files.extend(get_files(args.path))
 
     if args.compress:
         files = [compress_files(files)]
