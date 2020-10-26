@@ -209,7 +209,7 @@ def get_disk_space_left(sess):
 def get_files(path):
     p = pathlib.Path(path)
     if p.is_dir():
-        return p.glob("*")
+        return list(p.glob("*"))
     else:
         return [p]
 
