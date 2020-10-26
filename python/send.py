@@ -250,7 +250,7 @@ def main():
     # Send files
     files = []
     for p in args.path:
-        files.extend(get_files(args.path))
+        files.extend(get_files(p))
 
     if args.compress:
         files = [compress_files(files)]
