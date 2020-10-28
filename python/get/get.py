@@ -1,5 +1,6 @@
 import argparse
 import os
+import getpass
 import xml.etree.ElementTree as ET
 import time
 import requests
@@ -25,7 +26,7 @@ def parse_args():
 
     parser.add_argument(
         "-i",
-        "--interval"
+        "--interval",
         default=0,
         help="Check interval(sec), 0 for no repeat (default: %(default)s)",
         type=int,
@@ -34,7 +35,7 @@ def parse_args():
     parser.add_argument(
         "-o",
         "--output",
-        default="C:\Users\user\Downloads",
+        default="C:\\Users\\user\\Downloads",
         help="Download dir (default: %(default)s)",
     )
 
@@ -83,23 +84,26 @@ def download_data(sess, data, save_dir):
 
     dt = data["data"]
     for f in dt:
+        print("[*] Downlaoding:", f["name"])
         r = sess.post(
             url,
             params={
                 "cmd": "attache",
                 "DATA_FLAG": "R",
-                "DOC_NO": dt["no"],
+                "DOC_NO": data["no"],
                 "fPath": f["path"],
                 "fName": f["name"],
-            }
+            },
             data={
                 "DATA_FLAG": "R",
-                "DOC_NO": dt["no"],
+                "DOC_NO": data["no"],
             }
         )
 
-        with open(os.path.join(save_dir, f["name"]), "w") as fp:
+        with open(os.path.join(save_dir, f["name"]), "wb") as fp:
             fp.write(r.content)
+
+        print("[*] Done:", f["name"])
 
 
 def get_not_read_files(sess):
@@ -120,7 +124,7 @@ def get_not_read_files(sess):
     tree = ET.fromstring(xml)
     data_list = []
     for data in tree.findall("DATA_LIST"):
-        is_read = data.find("READ_YN")
+        is_read = data.find("READ_YN").text
         
         if is_read == "Y":
             continue
@@ -131,14 +135,14 @@ def get_not_read_files(sess):
                 "no": data.find("DOC_NO").text,
                 "title": data.find("DATA_TITLE").text,
                 "recv_time": data.find("DATA_RECV_TIME").text,
-                "status": data.find("STATUS"),
+                "status": data.find("STATUS").text,
             }
         )
 
-        names = data.find("DATA_NAME").split(":")
-        paths = data.findD("DATA_PATH").split(":")
+        names = data.find("DATA_NAME").text.split(":")
+        paths = data.find("DATA_PATH").text.split(":")
         files = [{"name": n, "path": p} for n, p in zip(names, paths)]
-        data_list["data"] = files
+        data_list[-1]["data"] = files
 
     
     return data_list
@@ -158,9 +162,9 @@ def main():
     if not username or not password:
         print("Set ADD_USERNAME and ADD_PASSWORD for authentication")
         print("If you want to type auth information directly, use `-p` option")
-        sys.exit(1)
+        exit(1)
 
-    session = login(username, password)
+    sess = login(username, password)
     print("[*] Successfully logged in")
 
     while True:
@@ -170,6 +174,7 @@ def main():
             download_data(sess, data, args.output)
             if not args.keep:
                 delete_data(sess, data)
+                time.sleep(2)
         
         if args.interval == 0:
             break
