@@ -17,9 +17,9 @@ jobs:
     - name: Package Application
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
-        path: python
+        path: python/send
 
     - uses: actions/upload-artifact@v2
       with:
-        name: name-of-artifact
+        name: send
         path: python
