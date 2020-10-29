@@ -110,7 +110,7 @@ def download_data(sess, data, save_dir):
             fp.write(r.content)
 
         downloaded.append(f["path"])
-        print("[*] Done:", f["name"])692830
+        print("[*] Done:", f["name"])
 
 
 def get_not_read_files(sess):
