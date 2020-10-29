@@ -5,6 +5,8 @@ import xml.etree.ElementTree as ET
 import time
 import requests
 
+downloaded = []
+
 def parse_args():
     parser = argparse.ArgumentParser()
     
@@ -80,10 +82,14 @@ def delete_data(sess, data):
 
 
 def download_data(sess, data, save_dir):
+    global downloaded
     url = "https://mail.add.re.kr/data.Data.do"
 
     dt = data["data"]
     for f in dt:
+        if f["path"] in downloaded:
+            continue
+
         print("[*] Downlaoding:", f["name"])
         r = sess.post(
             url,
@@ -103,7 +109,8 @@ def download_data(sess, data, save_dir):
         with open(os.path.join(save_dir, f["name"]), "wb") as fp:
             fp.write(r.content)
 
-        print("[*] Done:", f["name"])
+        downloaded.append(f["path"])
+        print("[*] Done:", f["name"])692830
 
 
 def get_not_read_files(sess):
@@ -174,7 +181,6 @@ def main():
             download_data(sess, data, args.output)
             if not args.keep:
                 delete_data(sess, data)
-                time.sleep(2)
         
         if args.interval == 0:
             break
