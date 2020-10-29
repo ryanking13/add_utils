@@ -240,9 +240,12 @@ def main():
         password = os.environ.get("ADD_PASSWORD")
 
     if not username or not password:
-        print("Set ADD_USERNAME and ADD_PASSWORD for authentication")
-        print("If you want to type auth information directly, use `-p` option")
-        sys.exit(1)
+        # print("Set ADD_USERNAME and ADD_PASSWORD for authentication")
+        # print("If you want to type auth information directly, use `-p` option")
+        # sys.exit(1)
+        print("ADD_USERNAME or ADD_PASSWORD not set")
+        username = input("Username: ").strip()
+        password = getpass.getpass("Password: ").strip()
 
     session = login(username, password)
     print("[*] Successfully logged in")
