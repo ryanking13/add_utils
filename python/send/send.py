@@ -256,7 +256,7 @@ def main():
         files.extend(get_files(p))
 
     if args.compress:
-        files = [compress_files(files)]
+        files = [compress_files(files, args.path[0])]
 
     num_files = len(files)
     print("[*] Trying to send %d file(s)..." % num_files)
