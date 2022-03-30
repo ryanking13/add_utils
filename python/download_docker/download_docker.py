@@ -8,11 +8,12 @@ import shutil
 import requests
 import tarfile
 import urllib3
+import sys
 urllib3.disable_warnings()
 
 if len(sys.argv) != 2 :
 	print('Usage:\n\tdocker_pull.py [registry/][repository/]image[:tag|@digest]\n')
-	exit(1)
+	sys.exit(1)
 
 # Look for the Docker image to download
 repo = 'library'
@@ -83,7 +84,7 @@ if (resp.status_code != 200):
 			for key, value in manifest["platform"].items():
 				sys.stdout.write('{}: {}, '.format(key, value))
 			print('digest: {}'.format(manifest["digest"]))
-	exit(1)
+	sys.exit(1)
 layers = resp.json()['layers']
 
 # Create tmp folder that will hold the image
@@ -135,7 +136,7 @@ for layer in layers:
 		if (bresp.status_code != 200):
 			print('\rERROR: Cannot download layer {} [HTTP {}]'.format(ublob[7:19], bresp.status_code, bresp.headers['Content-Length']))
 			print(bresp.content)
-			exit(1)
+			sys.exit(1)
 	# Stream download and follow the progress
 	bresp.raise_for_status()
 	unit = int(bresp.headers['Content-Length']) / 50
