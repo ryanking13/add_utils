@@ -14,12 +14,17 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Package Application
+    - name: Package Application send
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
         path: python/send
 
+    - name: Package Application download docker
+      uses: JackMcKew/pyinstaller-action-windows@main
+      with:
+        path: python/download_docker
+
     - uses: actions/upload-artifact@v2
       with:
-        name: send
+        name: apps
         path: python
